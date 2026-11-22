@@ -69,11 +69,60 @@ USER_AGENT = (
 _PACK_FP_STRUCT = struct.Struct("<BQII32s32s32s32s")
 
 QUALITY_PRESETS = {
-    "render_lite": {"width": 480, "height": 270, "fps": 8, "kbps": 150, "max_kbps": 250},
-    "farm10fps": {"width": 640, "height": 360, "fps": 10, "kbps": 250, "max_kbps": 400},
-    "720p30": {"width": 1280, "height": 720, "fps": 30, "kbps": 2200, "max_kbps": 3500},
-    "720p60": {"width": 1280, "height": 720, "fps": 60, "kbps": 3200, "max_kbps": 4800},
-    "1080p30": {"width": 1920, "height": 1080, "fps": 30, "kbps": 4000, "max_kbps": 6000},
+    "ultra_lite": {
+        "width": 256,
+        "height": 144,
+        "fps": 5,
+        "kbps": 50,
+        "max_kbps": 100,
+        "include_audio": False,
+        "static_black": True,
+    },
+    "render_lite": {
+        "width": 480,
+        "height": 270,
+        "fps": 8,
+        "kbps": 150,
+        "max_kbps": 250,
+        "include_audio": True,
+        "static_black": False,
+    },
+    "farm10fps": {
+        "width": 640,
+        "height": 360,
+        "fps": 10,
+        "kbps": 250,
+        "max_kbps": 400,
+        "include_audio": True,
+        "static_black": False,
+    },
+    "720p30": {
+        "width": 1280,
+        "height": 720,
+        "fps": 30,
+        "kbps": 2200,
+        "max_kbps": 3500,
+        "include_audio": True,
+        "static_black": False,
+    },
+    "720p60": {
+        "width": 1280,
+        "height": 720,
+        "fps": 60,
+        "kbps": 3200,
+        "max_kbps": 4800,
+        "include_audio": True,
+        "static_black": False,
+    },
+    "1080p30": {
+        "width": 1920,
+        "height": 1080,
+        "fps": 30,
+        "kbps": 4000,
+        "max_kbps": 6000,
+        "include_audio": True,
+        "static_black": False,
+    },
 }
 
 _NSFW_PATTERN = re.compile(
@@ -712,8 +761,8 @@ def find_ffmpeg_bin() -> str | None:
             except OSError:
                 pass
         return str(local_ff)
-    node_av_ff = WEBRTC_DIR / "node_modules" / "node-av" / "binary" / "ffmpeg" / "ffmpeg"
-    if node_av_ff.exists():
+    node_av_ff = WEBRTC_DIR / "node_modules" / "node-av" / "binary" / "ffmpeg"
+    if node_av_ff.is_file():
         return str(node_av_ff)
     return shutil.which("ffmpeg")
 
@@ -739,7 +788,7 @@ def install_webrtc_stack(log: Logger) -> bool:
         if not has_ffmpeg_libzmq():
             if shutil.which("ffmpeg"):
                 log.info("system ffmpeg found (checking libzmq/BtbN fallback)...")
-            if os.name != "nt" and not has_ffmpeg_libzmq():
+            if sys.platform.startswith("linux") and not has_ffmpeg_libzmq():
                 log.info("downloading lightweight BtbN FFmpeg build (with libzmq)...")
                 subprocess.run(
                     "curl -sL https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz "
@@ -789,12 +838,15 @@ def prepare_playable_mp4(media_source: str, quality_key: str, log: Logger) -> st
     ff_bin = find_ffmpeg_bin() or "ffmpeg"
     MEDIA_CACHE_DIR.mkdir(parents=True, exist_ok=True)
     src = media_source.strip()
-    q_cfg = QUALITY_PRESETS.get(quality_key, QUALITY_PRESETS["farm10fps"])
+    q_cfg = QUALITY_PRESETS.get(quality_key, QUALITY_PRESETS["ultra_lite"])
     w, h, fps, kbps = q_cfg["width"], q_cfg["height"], q_cfg["fps"], q_cfg["kbps"]
+    max_kbps = q_cfg["max_kbps"]
+    use_black = bool(q_cfg.get("static_black", False))
 
-    cache_hash = hashlib.sha256(f"lite:{src or 'testsrc'}:{w}x{h}@{fps}".encode("utf-8")).hexdigest()[:16]
+    src_tag = src or ("black" if use_black else "testsrc")
+    cache_hash = hashlib.sha256(f"lite2:{quality_key}:{src_tag}:{w}x{h}@{fps}".encode("utf-8")).hexdigest()[:16]
     cached_mp4 = MEDIA_CACHE_DIR / f"media_{cache_hash}.mp4"
-    if cached_mp4.exists() and cached_mp4.stat().st_size > 10_000:
+    if cached_mp4.exists() and cached_mp4.stat().st_size > 1_024:
         log.ok("media", f"loaded cached {h}p{fps} MP4 ({cached_mp4.name})")
         return str(cached_mp4)
 
@@ -848,15 +900,17 @@ def prepare_playable_mp4(media_source: str, quality_key: str, log: Logger) -> st
             except OSError:
                 pass
 
+    lavfi_video = f"color=c=black:s={w}x{h}:r={fps}" if use_black else f"testsrc=size={w}x{h}:rate={fps}"
     subprocess.run(
         [
             ff_bin, "-y", "-hide_banner", "-loglevel", "error", "-threads", "1",
-            "-f", "lavfi", "-i", f"testsrc=size={w}x{h}:rate={fps}",
+            "-f", "lavfi", "-i", lavfi_video,
             "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo",
-            "-t", "6",
-            "-c:v", "libx264", "-preset", "ultrafast", "-profile:v", "baseline",
-            "-pix_fmt", "yuv420p", "-b:v", f"{kbps}k",
-            "-c:a", "aac", "-ar", "48000", "-ac", "2", "-b:a", "96k",
+            "-t", "10",
+            "-c:v", "libx264", "-preset", "ultrafast", "-profile:v", "baseline", "-level", "3.1",
+            "-pix_fmt", "yuv420p", "-b:v", f"{kbps}k", "-maxrate", f"{max_kbps}k", "-bufsize", f"{max_kbps * 2}k",
+            "-r", str(fps), "-g", str(fps * 2),
+            "-c:a", "aac", "-ar", "48000", "-ac", "2", "-b:a", "64k",
             "-movflags", "+faststart",
             str(cached_mp4),
         ],
@@ -1127,7 +1181,7 @@ class StreamTelemetryClient:
     def build_stream_start(
         self, game: Game, gsid: str, guild_id: str, channel_id: str,
         rtc_id: str, media_id: str, region: str, host: str,
-        viewer_count: int, fps: int, height: int,
+        viewer_count: int, fps: int, height: int, has_sound: bool = True,
     ) -> list[dict]:
         now_ms = int(time.time() * 1000)
         fp = self.fp_engine.for_game(game.id, game.exe)
@@ -1153,7 +1207,7 @@ class StreamTelemetryClient:
                     "channel_id": channel_id, "channel_type": 2, "stream_type": "guild", "share_type": "application",
                     "capture_method": "game_hook", "share_application_name": game.name, "share_application_id": game.id,
                     "share_application_executable": game.exe, "game_id": game.id, "game_name": game.name,
-                    "target_fps": fps, "target_resolution_height": height, "has_sound": True,
+                    "target_fps": fps, "target_resolution_height": height, "has_sound": has_sound,
                     "num_viewers": v_cnt, "max_viewers": v_cnt, "launch_signature": self.launch_signature,
                     "client_app_state": "focused", "client_send_timestamp": now_ms + 45,
                 },
@@ -1195,7 +1249,7 @@ class StreamTelemetryClient:
     def build_stream_heartbeat(
         self, game: Game, gsid: str, delta_sec: float, cumulative_sec: float,
         guild_id: str, channel_id: str, rtc_id: str, media_id: str,
-        region: str, viewer_count: int, fps: int, height: int, include_ui_camo: bool = False,
+        region: str, viewer_count: int, fps: int, height: int, include_ui_camo: bool = False, has_sound: bool = True,
     ) -> list[dict]:
         now_ms = int(time.time() * 1000)
         dur_ms = max(1000, int(round(delta_sec * 1000)))
@@ -1216,7 +1270,7 @@ class StreamTelemetryClient:
                 "share_application_executable": game.exe, "game_id": game.id, "game_name": game.name,
                 "duration": dur_sec, "duration_ms": dur_ms, "duration_tracked_ms": dur_ms,
                 "duration_streaming_ms": dur_ms, "frames_sent": dur_sec * fps,
-                "target_fps": fps, "target_resolution_height": height, "has_sound": True,
+                "target_fps": fps, "target_resolution_height": height, "has_sound": has_sound,
                 "num_viewers": v_cnt, "max_viewers": v_cnt, "launch_signature": self.launch_signature,
                 "client_app_state": "focused", "client_send_timestamp": now_ms + 10,
             },
@@ -1237,7 +1291,7 @@ class StreamTelemetryClient:
 
     def build_stream_end(
         self, game: Game, gsid: str, total_sec: float, guild_id: str, channel_id: str,
-        rtc_id: str, media_id: str, region: str, viewer_count: int, fps: int, height: int,
+        rtc_id: str, media_id: str, region: str, viewer_count: int, fps: int, height: int, has_sound: bool = True,
     ) -> list[dict]:
         now_ms = int(time.time() * 1000)
         dur_ms = max(1000, int(round(total_sec * 1000)))
@@ -1249,7 +1303,7 @@ class StreamTelemetryClient:
             "channel_id": channel_id, "channel_type": 2, "stream_type": "guild", "share_type": "application",
             "capture_method": "game_hook", "share_application_name": game.name, "share_application_id": game.id,
             "share_application_executable": game.exe, "game_id": game.id, "game_name": game.name,
-            "target_fps": fps, "target_resolution_height": height, "has_sound": True,
+            "target_fps": fps, "target_resolution_height": height, "has_sound": has_sound,
             "launch_signature": self.launch_signature, "client_app_state": "focused",
         }
         return [
@@ -1346,7 +1400,8 @@ class WebRTCSidecar:
     def start(self) -> None:
         WEBRTC_DIR.mkdir(parents=True, exist_ok=True)
         (WEBRTC_DIR / "worker.mjs").write_text(_WEBRTC_WORKER_MJS.strip(), encoding="utf-8")
-        q_cfg = QUALITY_PRESETS.get(self.quality_key, QUALITY_PRESETS["farm10fps"])
+        q_cfg = QUALITY_PRESETS.get(self.quality_key, QUALITY_PRESETS["ultra_lite"])
+        include_audio = bool(q_cfg.get("include_audio", True)) and (sys.platform != "darwin")
         payload = {
             "token": self.token,
             "role": self.role,
@@ -1360,7 +1415,7 @@ class WebRTCSidecar:
             "fps": q_cfg["fps"],
             "kbps": q_cfg["kbps"],
             "maxKbps": q_cfg["max_kbps"],
-            "includeAudio": sys.platform != "darwin",
+            "includeAudio": include_audio,
             "status": self.status,
             "activities": self.activities,
             "superProps": self.super_props,
@@ -1590,6 +1645,7 @@ class StreamRunner247:
             meta["rtc_connection_id"], meta["media_session_id"],
             meta.get("stream_region") or "singapore", meta.get("endpoint_host") or "",
             max(1, len(self.sidecar.viewer_ids)), q_cfg["fps"], q_cfg["height"],
+            has_sound=bool(q_cfg.get("include_audio", True)) and (sys.platform != "darwin"),
         )
         st = self.telemetry.post_science(evs)
         if st in (401, 403):
@@ -1615,6 +1671,7 @@ class StreamRunner247:
                     self.game, gsid, sess_sec, self.guild_id, self.channel_id,
                     meta["rtc_connection_id"], meta["media_session_id"],
                     meta.get("stream_region") or "singapore", v_cnt, q_cfg["fps"], q_cfg["height"],
+                    has_sound=bool(q_cfg.get("include_audio", True)) and (sys.platform != "darwin"),
                 )
                 self.telemetry.post_science(evs)
                 self.log.ok("stream-247", f"closed SFU session cleanly ({sess_sec / 3600.0:.2f}h)")
@@ -1707,6 +1764,7 @@ class StreamRunner247:
                 meta.get("stream_region") or "singapore",
                 viewer_count=sfu_viewers, fps=fps, height=height,
                 include_ui_camo=(hb_idx % 5 == 1),
+                has_sound=bool(q_cfg.get("include_audio", True)) and (sys.platform != "darwin"),
             )
             st = self.telemetry.post_science(evs)
             if st in (401, 403):
@@ -1781,9 +1839,9 @@ def main() -> int:
         ok = install_webrtc_stack(log)
         if ok:
             try:
-                q = os.environ.get("STREAM_QUALITY", "farm10fps").strip().lower()
+                q = os.environ.get("STREAM_QUALITY", "ultra_lite").strip().lower()
                 if q not in QUALITY_PRESETS:
-                    q = "farm10fps"
+                    q = "ultra_lite"
                 prepare_playable_mp4(os.environ.get("STREAM_MEDIA_URL", ""), q, log)
             except Exception as exc:
                 log.warn("setup", f"pre-cache mp4 skipped ({exc})")
@@ -1794,9 +1852,9 @@ def main() -> int:
     guild_id = os.environ.get("GUILD_ID", "").strip()
     channel_id = os.environ.get("CHANNEL_ID", "").strip()
     game_query = os.environ.get("STREAM_GAME", "Grand Theft Auto: Vice City").strip()
-    quality_key = os.environ.get("STREAM_QUALITY", "farm10fps").strip().lower()
+    quality_key = os.environ.get("STREAM_QUALITY", "ultra_lite").strip().lower()
     if quality_key not in QUALITY_PRESETS:
-        quality_key = "farm10fps"
+        quality_key = "ultra_lite"
     media_url = os.environ.get("STREAM_MEDIA_URL", "").strip()
     status = os.environ.get("STREAM_STATUS", "online").strip().lower()
     if status not in ("online", "idle", "dnd", "invisible"):
