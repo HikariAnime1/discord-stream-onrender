@@ -1,4 +1,6 @@
-FROM node:22-slim
+FROM node:22-trixie-slim
+
+ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 ffmpeg curl ca-certificates xz-utils \
@@ -7,7 +9,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 COPY stream.py .
 
-# Cài sẵn gói WebRTC & tạo sẵn MP4 ngay lúc Build
 RUN python3 -u stream.py --setup-only
 
 CMD ["python3", "-u", "stream.py"]
