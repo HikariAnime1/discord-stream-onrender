@@ -1642,7 +1642,7 @@ def prepare_playable_mp4(media_source: str, quality_key: str, log: Logger) -> st
     fallback_ua = build_desktop_user_agent(
         "windows", FALLBACK_CLIENT_VERSION, FALLBACK_CHROME_VERSION, FALLBACK_ELECTRON_VERSION
     )
-    gop = (fps * 10) if video_mode == "static_720p" else (fps if no_transcoding else fps * 2)--
+    gop = (fps * 10) if video_mode == "static_720p" else (fps if no_transcoding else fps * 2)
     x264_extra = (
         ["-tune", "zerolatency", "-bf", "0", "-x264-params", "repeat-headers=1:scenecut=0", "-keyint_min", str(gop)]
         if no_transcoding else []
