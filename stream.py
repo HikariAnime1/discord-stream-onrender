@@ -1702,7 +1702,7 @@ def prepare_playable_mp4(media_source: str, quality_key: str, log: Logger) -> st
 
     if video_mode == "black":
         lavfi_video = f"color=c=black:s={w}x{h}:r={fps}"
-        extra_vf: list[str] = []-
+        extra_vf: list[str] = []
     elif video_mode == "static_720p":
         # Pure static 1280x720@30fps grid -> near-zero P-frame size (~8-12 kbps total)
         lavfi_video = f"color=c=0x0d1117:s={w}x{h}:r={fps}"
