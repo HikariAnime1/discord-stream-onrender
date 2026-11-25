@@ -1698,15 +1698,15 @@ def prepare_playable_mp4(media_source: str, quality_key: str, log: Logger) -> st
             except OSError:
                 pass
 
-    duration_sec = "60" if no_transcoding else "10"
+    duration_sec = "10"
 
     if video_mode == "black":
         lavfi_video = f"color=c=black:s={w}x{h}:r={fps}"
         extra_vf: list[str] = []
     elif video_mode == "static_720p":
-        # Pure static 1280x720@30fps grid -> near-zero P-frame size (~8-12 kbps total)
+        # Pure static 1280x720@30fps dark frame -> builds in ~5s & stays under 5GB/month
         lavfi_video = f"color=c=0x0d1117:s={w}x{h}:r={fps}"
-        extra_vf = ["-vf", "drawgrid=w=80:h=80:t=1:c=0x161b22@0.35,format=yuv420p"]
+        extra_vf = ["-vf", f"drawbox=x=24:y=24:w={w - 48}:h={h - 48}:color=0x161b22:t=2,format=yuv420p"]
     elif video_mode == "ambient_720p":
         lavfi_video = f"color=c=0x0d1117:s={w}x{h}:r={fps}"
         extra_vf = [
@@ -1747,7 +1747,7 @@ def prepare_playable_mp4(media_source: str, quality_key: str, log: Logger) -> st
         "-movflags", "+faststart",
         str(cached_mp4),
     ]
-    subprocess.run(cmd, check=False, timeout=60)
+    subprocess.run(cmd, check=False, timeout=180)
     if not cached_mp4.exists() or cached_mp4.stat().st_size == 0:
         raise RuntimeError(f"FFmpeg could not generate MP4 at {cached_mp4}")
     log.ok("media", f"generated {h}p{fps} ({video_mode}) MP4 ({cached_mp4.stat().st_size // 1024} KB)")
