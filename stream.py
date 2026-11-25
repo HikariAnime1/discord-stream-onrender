@@ -284,15 +284,15 @@ QUALITY_PRESETS = {
         "no_transcoding": False,
         "video_mode": "testsrc",
     },
-    "720p30_lite": {
+   "720p30_5gb": {
         "width": 1280,
         "height": 720,
         "fps": 30,
-        "kbps": 180,
-        "max_kbps": 280,
-        "include_audio": True,
+        "kbps": 8,
+        "max_kbps": 14,
+        "include_audio": False,
         "no_transcoding": True,
-        "video_mode": "ambient_720p",
+        "video_mode": "static_720p",
     },
     "720p30": {
         "width": 1280,
