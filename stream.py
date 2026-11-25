@@ -1,78 +1,23 @@
 #!/usr/bin/env python3
 """
-Discord Go-Live Stealth Streamer v7.1 — Audited & Patched Human Desktop Parity Edition
+Discord Go-Live Stealth Streamer v7.2 — Audited & Patched Human Desktop Parity Edition
+New in v7.2:
+- [NEW] 720p30_lite Quality Preset: pre-encodes a 1280x720 @ 30fps dark HUD MP4 with
+    subtle continuous motion + silent stereo audio track (H.264 Baseline, repeat-headers,
+    zero B-frames, ~180-280 kbps) and streams via FFmpeg stream-copy (noTranscoding=true)
+    for authentic 720p30 Discord recognition with near-zero CPU/RAM overhead on Render Free,
+    plus automatic fallback to ultrafast single-threaded software encode if needed.
 Fixes & Refinements in v7.1:
-  - [FIX] Gateway Loopback + Proxy Conflict: skips wsClientOpts.agent when wsBridgeActive=true
+- [FIX] Gateway Loopback + Proxy Conflict: skips wsClientOpts.agent when wsBridgeActive=true
     so ws://127.0.0.1:<port>/gw/<secret> connects locally while *.discord.media still uses proxy.
-  - [FIX] Startup Crash with DISCORD_DEVICE_COOKIES: seeds cookies AFTER _curl_sess init.
-  - [FIX] Cookie Isolation: DISCORD_DEVICE_COOKIES applies ONLY to Main; ALT_DEVICE_COOKIES
+- [FIX] Startup Crash with DISCORD_DEVICE_COOKIES: seeds cookies AFTER _curl_sess init.
+- [FIX] Cookie Isolation: DISCORD_DEVICE_COOKIES applies ONLY to Main; ALT_DEVICE_COOKIES
     applies ONLY to Alt (eliminates cross-account device cookie leak).
-  - [FIX] Thread-safe curl_cffi WS handshake lock in LocalChromeWSBridge._open_upstream().
-  - [FIX] Propagates captcha/verification lock detection (400 captcha_key, 403 40002) to
+- [FIX] Thread-safe curl_cffi WS handshake lock in LocalChromeWSBridge._open_upstream().
+- [FIX] Propagates captcha/verification lock detection (400 captcha_key, 403 40002) to
     ensure_analytics_token() and post_science() Circuit Breaker.
-  - [OPT] Decoupled running_game_heartbeat cadence (180-300s) from video_stream_heartbeat (~60s).
-  - [OPT] Adaptive exponential backoff (15-60s) for Alt Viewer OP 20 polling when stream is absent.
-New in v7:
-  - Fixed v6 watchdog method placement into StreamRunnerStealth (guaranteed runtime IP guard).
-  - Secret & Token Redaction in Logger: automatically scrubs Discord tokens, proxy credentials,
-    and auth secrets from stdout/Render logs so nothing sensitive is ever exposed.
-  - Persistent Device Cookies (__dcfduid, __sdcfduid) support via env/state to avoid looking
-    like a brand-new stolen-token login on every container restart.
-  - Humanized Daily Schedule Jitter (ACTIVE_HOURS_JITTER_MIN): shifts start/stop times by
-    random ±minutes each calendar day so activity never looks like a rigid cron job.
-  - Authentic Desktop Event Order: sends launch_game + initial running_game_heartbeat BEFORE
-    Go-Live stream_started (matching real Discord Desktop game detection -> Go Live flow).
-  - Humanized Alt Viewer Lifecycle: Alt joins 10-28s after stream starts and leaves 8-25s
-    after streamer stops for breaks/rest instead of idling robotically in an empty VC.
-  - Pre-Flight Anti-Detection Audit + Extended Auth/Captcha/Verification Circuit Breaker.
-New in v6:
-  - LocalChromeWSBridge (RFC 6455 loopback relay -> curl_cffi Chrome JA3/JA4 WebSocket):
-    Tunnels Node Gateway WS (wss://gateway.discord.gg) through Python curl_cffi Chrome TLS
-    with synced cookies, headers & proxy (auto-fallback if curl_cffi lacks ws_connect).
-  - Runtime Egress IP Drift Watchdog (LOCK_INITIAL_IP + IP_WATCHDOG_MIN):
-    Continuously verifies egress IP/city/country mid-session; halts immediately on silent IP drift.
-  - Deep Fake Device v6: coherent GPU encoder (NVENC/QuickSync/VideoToolbox), power state,
-    simulated OS uptime, new win10_i3_desktop tier, and FAKE_* hardware env overrides.
-  - Deep Fake Desktop App v6: full Desktop Gateway OP 2 client_state & bot-field scrubbing,
-    expanded read-only cold-boot REST flow (settings-proto/1, settings-proto/2, country-code),
-    session identity rotation after ACTIVE_HOURS rest, realistic WebRTC telemetry jitter.
-  - Anti-Pattern Behavior: GAME_ROTATION + SESSION_BREAK_MIN + stealth_ambient video preset.
-New in v5:
-  - City/Region/ISP GeoIP Pinning & Fail-Closed Guard (EXPECTED_CITY, EXPECTED_REGION, EXPECTED_ISP)
-    NOTE: Login location (e.g. Da Nang, Da Nang, Vietnam) is determined by Discord/Cloudflare
-    strictly from the real egress IP, never from spoofed HTTP headers. This guard verifies
-    the proxy egress IP resolves to your target city/region BEFORE sending any token.
-  - Full Chromium/Electron High-Entropy Client Hints (sec-ch-ua-platform-version, arch, bitness,
-    full-version-list) strictly synchronized with DeviceProfile OS & Chrome version.
-  - Realistic Discord Desktop Cold-Boot REST sequence (/app -> /users/@me -> /settings-proto/1 -> app_opened).
-  - SDP WebRTC local container IP scrubbing in Node worker.
-Upgrades over v3:
-  1. Deep Fake Device Engine (DeviceProfile + Smooth Telemetry Drift)
-     - Deterministic, persistent virtual PC hardware profile bound to DEVICE_SEED (and
-       separate ALT_DEVICE_SEED so Main and Alt look like two genuinely distinct PCs).
-     - Coherent Windows 10/11 or macOS hardware matrix: CPU brand/cores, total system RAM,
-       GPU vendor/model, display resolution/scale/count, audio I/O devices, OS SDK/build.
-     - Smooth random-walk CPU & memory telemetry drift around realistic game-streaming baselines
-       instead of erratic random spikes.
-  2. Deep Fake Discord Desktop App (ClientBuildResolver + Electron/Gateway Normalization)
-     - Live Discord Desktop Stable metadata discovery: CordAPI primary + official Discord
-       updater API fallback (/api/updates/stable) so client_version stays current.
-     - Exact Electron Desktop REST headers: synchronized x-super-properties, User-Agent,
-       Sec-CH-UA*, Sec-Fetch-*, Accept-Language, dynamic channel Referer, and complete
-       scrubbing of discord.js/undici/Node headers at LocalChromeTLSBridge.
-     - Gateway OP 2 Identify normalization: aligns properties, modern Desktop capabilities
-       bitmask, and client_state strictly with official Discord Desktop v9.
-  3. Authentic Desktop App Lifecycle & Behavioral Engine
-     - Organic cold-boot flow: /app cookie warm-up -> /users/@me -> app_opened telemetry ->
-       join voice (natural self_mute/self_deaf) -> launch game presence -> Go-Live stream.
-     - FocusSimulator (state-duration Markov model): stays background for 4-15 min while
-       "playing", occasionally Alt-Tabs to focused for 1-3 min, then returns to background.
-     - Authentic Desktop shutdown sequence: stream end -> final game heartbeat -> clear
-       Presence (OP 3) -> stop stream (OP 19) -> leave voice (OP 4).
-  4. Inherited v3 Network Protections
-     - Fail-Closed Egress IP & Country Guard (REQUIRE_PROXY, EXPECTED_IP, ALLOWED_COUNTRIES).
-     - Local Chrome-TLS REST Bridge (127.0.0.1 + curl_cffi) + Node https.request WS hook.
-     - Auth-Lock Circuit Breaker (halts cleanly on 401/403/4004).
+- [OPT] Decoupled running_game_heartbeat cadence (180-300s) from video_stream_heartbeat (~60s).
+- [OPT] Adaptive exponential backoff (15-60s) for Alt Viewer OP 20 polling when stream is absent.
 
 Usage:
   Setup (Docker build): python3 -u stream.py --setup-only
@@ -156,7 +101,6 @@ FALLBACK_DESKTOP_CAPABILITIES = 30717
 
 _PACK_FP_STRUCT = struct.Struct("<BQII32s32s32s32s")
 
-# Realistic hardware tiers for deterministic Fake Device profiles
 _WIN_HARDWARE_TIERS = (
     {
         "tier": "win11_mid_desktop",
@@ -297,6 +241,7 @@ QUALITY_PRESETS = {
         "kbps": 50,
         "max_kbps": 100,
         "include_audio": False,
+        "no_transcoding": False,
         "video_mode": "black",
     },
     "stealth_ambient": {
@@ -306,6 +251,7 @@ QUALITY_PRESETS = {
         "kbps": 65,
         "max_kbps": 110,
         "include_audio": False,
+        "no_transcoding": False,
         "video_mode": "ambient_hud",
     },
     "stealth_lite": {
@@ -315,6 +261,7 @@ QUALITY_PRESETS = {
         "kbps": 90,
         "max_kbps": 150,
         "include_audio": False,
+        "no_transcoding": False,
         "video_mode": "dark_motion",
     },
     "render_lite": {
@@ -324,6 +271,7 @@ QUALITY_PRESETS = {
         "kbps": 150,
         "max_kbps": 250,
         "include_audio": True,
+        "no_transcoding": False,
         "video_mode": "dark_motion",
     },
     "farm10fps": {
@@ -333,7 +281,18 @@ QUALITY_PRESETS = {
         "kbps": 250,
         "max_kbps": 400,
         "include_audio": True,
+        "no_transcoding": False,
         "video_mode": "testsrc",
+    },
+    "720p30_lite": {
+        "width": 1280,
+        "height": 720,
+        "fps": 30,
+        "kbps": 180,
+        "max_kbps": 280,
+        "include_audio": True,
+        "no_transcoding": True,
+        "video_mode": "ambient_720p",
     },
     "720p30": {
         "width": 1280,
@@ -342,6 +301,7 @@ QUALITY_PRESETS = {
         "kbps": 2200,
         "max_kbps": 3500,
         "include_audio": True,
+        "no_transcoding": False,
         "video_mode": "testsrc",
     },
 }
@@ -357,12 +317,6 @@ _AAA_KEYWORDS = (
     "rocket league", "rainbow six", "pubg", "helldivers", "monster hunter",
 )
 
-# Native C++ WebRTC Sidecar Worker v4:
-#   - Routes 100% of Discord REST through Python's LocalChromeTLSBridge (Chrome JA3/JA4 + cookies)
-#   - Hooks Node https.request so ALL WebSockets (Gateway + Voice + Stream SFU) carry Desktop
-#     Origin/User-Agent/Accept-Language headers and pinned Proxy Agent
-#   - Normalizes Gateway OP 2 Identify (Desktop properties + capabilities bitmask + client_state)
-#   - Enforces realistic Desktop voice state (self_mute / self_deaf) and clean shutdown order
 _WEBRTC_WORKER_MJS = r"""
 import { Client } from "discord.js-selfbot-v13";
 import { Streamer, prepareStream, playStream, Utils, Encoders } from "@dank074/discord-video-stream";
@@ -412,7 +366,6 @@ for (const dir of searchDirs) {
   if (nodeDataChannel) break;
 }
 
-// Optional Proxy Agent for ALL Discord WebSockets (Gateway + Voice + Stream SFU)
 let wsProxyAgent = null;
 if (cfg.proxy) {
   try {
@@ -431,7 +384,6 @@ if (cfg.proxy) {
   }
 }
 
-// Harden Node https.request for WebSockets to discord.gg / discord.media / discord.com
 if (!httpsMod.__stealthHooked) {
   const origHttpsRequest = httpsMod.request;
   httpsMod.request = function patchedHttpsRequest(urlOrOpts, maybeOpts, maybeCb) {
@@ -471,7 +423,6 @@ if (!httpsMod.__stealthHooked) {
   httpsMod.__stealthHooked = true;
 }
 
-// Fallback fetch interceptor: rewrites any direct discord.com/api fetch into the local Chrome-TLS bridge
 if (typeof globalThis.fetch === "function" && !globalThis.fetch.__stealthWrapped) {
   const origFetch = globalThis.fetch.bind(globalThis);
   globalThis.fetch = function (input, init = {}) {
@@ -554,7 +505,6 @@ function inspectOutgoingPayload(wsObj, data) {
 
     const isGatewayWs = u.includes("gateway.discord.gg") || u.includes("/gw/");
 
-    // Fake Discord Desktop App: normalize Gateway OP 2 Identify completely
     if (isGatewayWs && pkt.op === 2 && pkt.d) {
       if (cfg.gatewayProps) {
         pkt.d.properties = { ...cfg.gatewayProps };
@@ -562,7 +512,6 @@ function inspectOutgoingPayload(wsObj, data) {
       if (typeof cfg.capabilities === "number" && cfg.capabilities > 0) {
         pkt.d.capabilities = cfg.capabilities;
       }
-      // Scrub bot-only fields if any library injects them
       delete pkt.d.intents;
       delete pkt.d.shard;
       pkt.d.client_state = {
@@ -584,7 +533,6 @@ function inspectOutgoingPayload(wsObj, data) {
       return JSON.stringify(pkt);
     }
 
-    // Normalize Voice State Update (OP 4) to realistic Desktop self_mute / self_deaf
     if (isGatewayWs && pkt.op === 4 && pkt.d && pkt.d.channel_id) {
       if (typeof cfg.selfMute === "boolean") pkt.d.self_mute = cfg.selfMute;
       if (typeof cfg.selfDeaf === "boolean") pkt.d.self_deaf = cfg.selfDeaf;
@@ -669,8 +617,6 @@ if (cfg.enableSfuHook) {
 
 const wsClientOpts = {};
 if (cfg.gatewayProps) wsClientOpts.properties = cfg.gatewayProps;
-// CRITICAL: Never route loopback ws://127.0.0.1:<port>/gw/... through external proxy!
-// External *.discord.media sockets still get wsProxyAgent via https.request & connectViewerStreamWebRtc.
 if (wsProxyAgent && !cfg.wsBridgeActive) wsClientOpts.agent = wsProxyAgent;
 
 const clientOpts = {
@@ -821,7 +767,6 @@ function gracefulShutdown(exitCode = 0) {
     closeViewerStream();
     const shard = client.ws?.shards?.first();
     if (shard) {
-      // Authentic Desktop shutdown sequence: stop Go-Live -> clear game presence -> leave voice
       if (currentStreamKey) shard.send({ op: 19, d: { stream_key: currentStreamKey } });
       if (cfg.role === "streamer") sendRichPresenceOnce([]);
       shard.send({ op: 4, d: { guild_id: null, channel_id: null, self_mute: true, self_deaf: false, self_video: false } });
@@ -924,7 +869,6 @@ function connectViewerStreamWebRtc(endpoint, token) {
           });
           pc.onLocalDescription((sdp, type) => {
             if (type === "offer") {
-              // Scrub container/private LAN IPv4 addresses from SDP origin/connection lines
               sdp = sdp.replace(/^o=([^\r\n]*)\sIN\sIP4\s[0-9.]+/m, "o=$1 IN IP4 127.0.0.1");
               offerSdp = sdp;
               sendJson({
@@ -1011,7 +955,6 @@ client.on("ready", async () => {
   console.log(`[WEBRTC-READY] Authenticated as ${client.user?.tag || client.user?.id}`);
 
   const targetGuild = cfg.guildId && cfg.guildId.trim() !== "" ? cfg.guildId : null;
-  // Natural pause after opening Desktop app before clicking into voice channel
   const joinDelay = 2000 + Math.floor(Math.random() * 2500);
   await new Promise((r) => setTimeout(r, joinDelay));
 
@@ -1029,7 +972,6 @@ client.on("ready", async () => {
           missStreak = 0;
           nextMs = 20000 + Math.floor(Math.random() * 10000);
         } else {
-          // Backoff naturally: 15-24s -> 25-38s -> 42-60s when stream is offline
           const baseMs = Math.min(45000, 15000 + missStreak * 10000);
           nextMs = baseMs + Math.floor(Math.random() * 12000);
         }
@@ -1043,7 +985,7 @@ client.on("ready", async () => {
           }
           if (!viewerStreamWs || viewerStreamWs.readyState !== 1) {
             missStreak = Math.min(4, missStreak + 1);
-            client.ws?.shards?.first()?.send({ op: 20, d: { stream_key: streamKey } });
+            client.ws?.shards?.first()?.send({ op: 20, d: { stream_key: targetKey || streamKey } });
           } else {
             missStreak = 0;
           }
@@ -1054,7 +996,6 @@ client.on("ready", async () => {
       return;
     }
 
-    // Authentic Desktop order: Join Voice -> Launch Game Presence -> Go Live
     console.log(`[WEBRTC-VOICE] Connecting to Guild ${targetGuild} › Channel ${cfg.channelId}...`);
     await streamer.joinVoice(targetGuild, cfg.channelId);
     console.log(`[WEBRTC-JOINED] Voice/Video session established on Channel ${cfg.channelId}`);
@@ -1064,22 +1005,33 @@ client.on("ready", async () => {
 
     await new Promise((r) => setTimeout(r, 1500 + Math.floor(Math.random() * 2000)));
 
-    while (!isShuttingDown) {
-      const encoder = Encoders.software({
-        x264: { preset: "ultrafast" },
-        x265: { preset: "ultrafast" },
-      });
+    let useNoTranscoding = Boolean(cfg.noTranscoding);
 
-      const { command, output } = prepareStream(cfg.mediaFile, {
-        encoder,
-        height: Number(cfg.height) || 144,
-        frameRate: Number(cfg.fps) || 5,
-        bitrateVideo: Number(cfg.kbps) || 50,
-        bitrateVideoMax: Number(cfg.maxKbps) || 100,
-        includeAudio: Boolean(cfg.includeAudio !== false),
-        videoCodec: Utils.normalizeVideoCodec("H264"),
-        customInputOptions: ["-stream_loop", "-1"],
-      });
+    while (!isShuttingDown) {
+      const streamOpts = useNoTranscoding
+        ? {
+            noTranscoding: true,
+            includeAudio: Boolean(cfg.includeAudio !== false),
+            customInputOptions: ["-stream_loop", "-1", "-fflags", "+genpts"],
+          }
+        : {
+            encoder: Encoders.software({
+              x264: { preset: "ultrafast", tune: "zerolatency" },
+              x265: { preset: "ultrafast" },
+            }),
+            width: Number(cfg.width) || undefined,
+            height: Number(cfg.height) || 144,
+            frameRate: Number(cfg.fps) || 5,
+            bitrateVideo: Number(cfg.kbps) || 50,
+            bitrateVideoMax: Number(cfg.maxKbps) || 100,
+            includeAudio: Boolean(cfg.includeAudio !== false),
+            videoCodec: Utils.normalizeVideoCodec("H264"),
+            customInputOptions: ["-stream_loop", "-1"],
+            customOutputOptions: ["-threads", "1"],
+          };
+
+      const startedAt = Date.now();
+      const { command, output } = prepareStream(cfg.mediaFile, streamOpts);
 
       if (isShuttingDown) {
         try { command.kill("SIGKILL"); } catch (_) {}
@@ -1093,7 +1045,8 @@ client.on("ready", async () => {
         }
       });
 
-      console.log(`[WEBRTC-LIVE] Streaming ${cfg.height || 144}p${cfg.fps || 5} (${cfg.streamType}) · DAVE E2EE active`);
+      const modeTag = useNoTranscoding ? `${cfg.streamType}, copy/zero-cpu` : cfg.streamType;
+      console.log(`[WEBRTC-LIVE] Streaming ${cfg.height || 144}p${cfg.fps || 5} (${modeTag}) · DAVE E2EE active`);
 
       try {
         await playStream(output, streamer, { type: cfg.streamType });
@@ -1101,6 +1054,11 @@ client.on("ready", async () => {
         if (!isShuttingDown) {
           console.error(`[WEBRTC-ERROR] playStream: ${err?.message || err}`);
         }
+      }
+
+      if (useNoTranscoding && (Date.now() - startedAt) < 15000 && !isShuttingDown) {
+        console.log("[WEBRTC-LIVE] noTranscoding fallback -> switching to lightweight ultrafast encode");
+        useNoTranscoding = false;
       }
 
       if (isShuttingDown) break;
@@ -1216,7 +1174,6 @@ class DeviceProfile:
     _mem_cur_kb: int = 440_000
 
     def sample_perf(self) -> tuple[float, int]:
-        """Smooth random-walk CPU (%) and Electron memory (KB) drift like a real running Desktop app."""
         self._cpu_cur = max(1.1, min(9.8, self._cpu_cur + random.uniform(-0.65, 0.72)))
         mem_cap = min(820_000, int(self.ram_total_mb * 1024 * 0.08))
         self._mem_cur_kb = max(310_000, min(mem_cap, self._mem_cur_kb + random.randint(-9_500, 11_000)))
@@ -1240,12 +1197,6 @@ class DeviceProfile:
 
 
 class FocusSimulator:
-    """
-    Markov state-duration window focus simulator.
-    Real gamers stay in 'background' (game fullscreen) for 4-15 min, then Alt-Tab to Discord
-    ('focused') for 1-3 min, instead of flipping randomly every 60 seconds.
-    """
-
     def __init__(self) -> None:
         self._state = "focused"
         self._until_mono = time.monotonic() + random.uniform(45.0, 120.0)
@@ -1276,7 +1227,6 @@ def extract_user_id(token: str) -> str:
 
 
 def build_device_profile(user_id: str, spoof_os: str = "windows", seed: str = "", tier_hint: str = "") -> DeviceProfile:
-    """Generate a persistent, internally consistent Fake Device profile."""
     clean_os = "macos" if spoof_os.strip().lower() == "macos" else "windows"
     eff_seed = seed.strip() or f"desktop-vn-node:{clean_os}"
     digest = hashlib.sha256(f"{eff_seed}:{user_id}".encode("utf-8")).digest()
@@ -1288,7 +1238,6 @@ def build_device_profile(user_id: str, spoof_os: str = "windows", seed: str = ""
     if chosen is None:
         chosen = tiers[digest[0] % len(tiers)]
 
-    # Persist machine_guid on disk if possible, with deterministic fallback for ephemeral containers
     state: dict = {}
     if STATE_FILE.exists():
         try:
@@ -1316,7 +1265,6 @@ def build_device_profile(user_id: str, spoof_os: str = "windows", seed: str = ""
     cpu_base = round(2.2 + (digest[4] % 35) / 10.0, 2)
     boot_offset = float(3600 + (int.from_bytes(digest[5:7], "little") % 54000))
 
-    # Optional explicit hardware overrides for main profile when env vars are set
     cpu_brand = chosen["cpu_brand"]
     gpu_model = chosen["gpu_model"]
     ram_total_mb = chosen["ram_total_mb"]
@@ -1387,7 +1335,6 @@ def build_desktop_user_agent(
 
 
 def build_sec_ch_headers(user_agent: str, device: DeviceProfile) -> dict[str, str]:
-    """Generate full Electron/Chromium Client Hints matching exact Chrome version & DeviceProfile OS."""
     m_full = re.search(r"Chrome/([\d.]+)", user_agent)
     chrome_full = m_full.group(1) if m_full else FALLBACK_CHROME_VERSION
     chrome_major = chrome_full.split(".", 1)[0]
@@ -1398,7 +1345,6 @@ def build_sec_ch_headers(user_agent: str, device: DeviceProfile) -> dict[str, st
         arch = '"arm"' if device.os_arch == "arm64" else '"x86"'
     else:
         platform = '"Windows"'
-        # Windows 11 (build >= 22000) reports platform-version 15.0.0; Windows 10 reports 10.0.0
         try:
             sdk_num = int(device.os_sdk_version)
         except ValueError:
@@ -1421,13 +1367,6 @@ def build_sec_ch_headers(user_agent: str, device: DeviceProfile) -> dict[str, st
 def resolve_discord_app_props(
     device: DeviceProfile, launch_sig: str, hb_session: str, locale: str
 ) -> tuple[dict, dict, dict]:
-    """
-    Live Fake Discord Desktop App build resolver:
-      1. Try CordAPI for full current Discord Desktop Stable properties.
-      2. If unavailable, query Discord's official /api/updates/stable host endpoint for live client_version.
-      3. Merge strictly with DeviceProfile OS version / SDK / architecture so Device & App never contradict.
-    Returns (rest_super_props, gateway_identify_props, build_summary).
-    """
     cord_url = PROPERTIES_URL_MAC if device.spoof_os == "macos" else PROPERTIES_URL_WIN
     upd_url = UPDATES_URL_MAC if device.spoof_os == "macos" else UPDATES_URL_WIN
     fallback_ua = build_desktop_user_agent(
@@ -1487,7 +1426,6 @@ def resolve_discord_app_props(
             "design_id": 0,
         }
 
-    # Normalize & lock consistency between Fake Device and Fake Discord App
     props["os"] = device.os_name
     props["os_version"] = device.os_version
     props["os_sdk_version"] = device.os_sdk_version
@@ -1512,7 +1450,6 @@ def resolve_discord_app_props(
     )
     gw_props = {k: props[k] for k in gw_keys if k in props}
 
-    # Clean Desktop REST super_properties (ordered like official Electron client)
     rest_props = dict(gw_props)
     rest_props["client_launch_id"] = str(uuid.uuid4())
     rest_props["launch_signature"] = launch_sig
@@ -1543,11 +1480,6 @@ def parse_active_hours(spec: str) -> tuple[tuple[int, int], tuple[int, int]] | N
 
 
 class HumanSchedule:
-    """
-    Wraps ACTIVE_HOURS with deterministic-per-day human jitter (±jitter_min minutes)
-    so the streamer does not turn on/off at the exact same minute every day like a cron bot.
-    """
-
     def __init__(self, spec: str, tz_name: str, jitter_min: int = 18, seed: str = "") -> None:
         self.base = parse_active_hours(spec)
         self.tz_name = tz_name
@@ -1657,7 +1589,7 @@ def install_webrtc_stack(log: Logger) -> bool:
         WEBRTC_DIR.mkdir(parents=True, exist_ok=True)
         pkg_json = {
             "name": "revere-webrtc-stealth",
-            "version": "7.1.0",
+            "version": "7.2.0",
             "private": True,
             "type": "module",
             "dependencies": {
@@ -1681,7 +1613,7 @@ def install_webrtc_stack(log: Logger) -> bool:
                 cwd=str(WEBRTC_DIR),
                 check=True,
             )
-        log.ok("setup", "WebRTC stealth v7.1 sidecar ready")
+        log.ok("setup", "WebRTC stealth v7.2 sidecar ready")
         return True
     except Exception as exc:
         log.err("setup", f"failed: {exc}")
@@ -1696,32 +1628,40 @@ def prepare_playable_mp4(media_source: str, quality_key: str, log: Logger) -> st
     w, h, fps, kbps = q_cfg["width"], q_cfg["height"], q_cfg["fps"], q_cfg["kbps"]
     max_kbps = q_cfg["max_kbps"]
     video_mode = str(q_cfg.get("video_mode", "black"))
+    include_audio = bool(q_cfg.get("include_audio", False))
+    no_transcoding = bool(q_cfg.get("no_transcoding", False))
 
     src_tag = src or video_mode
-    cache_hash = hashlib.sha256(f"stealth71:{quality_key}:{src_tag}:{w}x{h}@{fps}".encode("utf-8")).hexdigest()[:16]
+    cache_hash = hashlib.sha256(f"stealth72:{quality_key}:{src_tag}:{w}x{h}@{fps}".encode("utf-8")).hexdigest()[:16]
     cached_mp4 = MEDIA_CACHE_DIR / f"media_{cache_hash}.mp4"
     if cached_mp4.exists() and cached_mp4.stat().st_size > 1_024:
-        log.ok("media", f"loaded cached {h}p{fps} MP4 ({cached_mp4.name})")
+        log.ok("media", f"loaded cached {h}p{fps} MP4 ({cached_mp4.name}, {cached_mp4.stat().st_size // 1024} KB)")
         return str(cached_mp4)
 
     vf_filter = f"scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2,format=yuv420p"
     fallback_ua = build_desktop_user_agent(
         "windows", FALLBACK_CLIENT_VERSION, FALLBACK_CHROME_VERSION, FALLBACK_ELECTRON_VERSION
     )
+    gop = fps if no_transcoding else fps * 2
+    x264_extra = (
+        ["-tune", "zerolatency", "-bf", "0", "-x264-params", "repeat-headers=1:scenecut=0", "-keyint_min", str(gop)]
+        if no_transcoding else []
+    )
 
     def _encode(in_path: str, is_img: bool = False, is_gif: bool = False) -> None:
         cmd = [ff_bin, "-y", "-hide_banner", "-loglevel", "error", "-threads", "1"]
         if is_img:
-            cmd += ["-loop", "1", "-t", "6", "-i", in_path, "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-shortest"]
+            cmd += ["-loop", "1", "-t", "15", "-i", in_path, "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-shortest"]
         elif is_gif:
-            cmd += ["-ignore_loop", "0", "-t", "8", "-i", in_path, "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-shortest"]
+            cmd += ["-ignore_loop", "0", "-t", "15", "-i", in_path, "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-shortest"]
         else:
             cmd += ["-i", in_path, "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-map", "0:v:0", "-map", "0:a:0?", "-map", "1:a:0", "-shortest"]
         cmd += [
             "-vf", vf_filter,
             "-c:v", "libx264", "-preset", "ultrafast", "-profile:v", "baseline", "-level", "3.1",
+            *x264_extra,
             "-pix_fmt", "yuv420p", "-b:v", f"{kbps}k", "-maxrate", f"{max_kbps}k", "-bufsize", f"{max_kbps * 2}k",
-            "-r", str(fps), "-g", str(fps * 2),
+            "-r", str(fps), "-g", str(gop),
             "-c:a", "aac", "-ar", "48000", "-ac", "2", "-b:a", "64k",
             "-movflags", "+faststart",
             str(cached_mp4),
@@ -1758,11 +1698,20 @@ def prepare_playable_mp4(media_source: str, quality_key: str, log: Logger) -> st
             except OSError:
                 pass
 
+    duration_sec = "60" if no_transcoding else "10"
+
     if video_mode == "black":
         lavfi_video = f"color=c=black:s={w}x{h}:r={fps}"
         extra_vf: list[str] = []
+    elif video_mode == "ambient_720p":
+        lavfi_video = f"color=c=0x0d1117:s={w}x{h}:r={fps}"
+        extra_vf = [
+            "-vf",
+            f"drawgrid=w=80:h=80:t=1:c=0x161b22@0.35,"
+            f"drawbox=x='mod(t*24,{w})':y={h - 12}:w=48:h=6:color=0x238636@0.65:t=fill,"
+            f"drawbox=x='mod(t*12+120,{w})':y=18:w=28:h=4:color=0x30363d@0.75:t=fill,format=yuv420p",
+        ]
     elif video_mode == "ambient_hud":
-        # Ultra-low bitrate dark HUD-like subtle dual motion so frame entropy is non-zero
         lavfi_video = f"color=c=0x0d1117:s={w}x{h}:r={fps}"
         extra_vf = [
             "-vf",
@@ -1777,20 +1726,24 @@ def prepare_playable_mp4(media_source: str, quality_key: str, log: Logger) -> st
         lavfi_video = f"testsrc=size={w}x{h}:rate={fps}"
         extra_vf = []
 
+    audio_in = ["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"] if include_audio else []
+    audio_out = ["-c:a", "aac", "-ar", "48000", "-ac", "2", "-b:a", "64k"] if include_audio else ["-an"]
+
     cmd = [
         ff_bin, "-y", "-hide_banner", "-loglevel", "error", "-threads", "1",
         "-f", "lavfi", "-i", lavfi_video,
-        "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo",
-        "-t", "10",
+        *audio_in,
+        "-t", duration_sec,
         *extra_vf,
         "-c:v", "libx264", "-preset", "ultrafast", "-profile:v", "baseline", "-level", "3.1",
+        *x264_extra,
         "-pix_fmt", "yuv420p", "-b:v", f"{kbps}k", "-maxrate", f"{max_kbps}k", "-bufsize", f"{max_kbps * 2}k",
-        "-r", str(fps), "-g", str(fps * 2),
-        "-c:a", "aac", "-ar", "48000", "-ac", "2", "-b:a", "64k",
+        "-r", str(fps), "-g", str(gop),
+        *audio_out,
         "-movflags", "+faststart",
         str(cached_mp4),
     ]
-    subprocess.run(cmd, check=False, timeout=25)
+    subprocess.run(cmd, check=False, timeout=60)
     if not cached_mp4.exists() or cached_mp4.stat().st_size == 0:
         raise RuntimeError(f"FFmpeg could not generate MP4 at {cached_mp4}")
     log.ok("media", f"generated {h}p{fps} ({video_mode}) MP4 ({cached_mp4.stat().st_size // 1024} KB)")
@@ -1890,11 +1843,6 @@ class LowLatencyHTTPSConnection(http.client.HTTPSConnection):
 
 
 class StreamTelemetryClient:
-    """
-    Unified Fake Device + Fake Discord Desktop App HTTP/2 Client.
-    Drives both Python telemetry AND Node's LocalChromeTLSBridge with a single coherent identity.
-    """
-
     def __init__(
         self, token: str, user_id: str, status: str = "online",
         locale: str = "vi", timezone: str = "Asia/Ho_Chi_Minh",
@@ -1930,12 +1878,10 @@ class StreamTelemetryClient:
         self.analytics_token = ""
         self.fetched_at = 0.0
 
-        # 1. Fake Device Profile
         self.device = build_device_profile(user_id, spoof_os=self.spoof_os, seed=device_seed, tier_hint=device_tier)
         self.fp_engine = FingerprintEngine(user_id, self.device.machine_guid)
         self.focus_sim = FocusSimulator()
 
-        # 2. Fake Discord Desktop App Build & Properties
         self.heartbeat_session = str(uuid.uuid4())
         self.launch_signature = str(uuid.uuid4())
         self.super_props_dict, self.gateway_props_dict, self.build_summary = resolve_discord_app_props(
@@ -2010,7 +1956,6 @@ class StreamTelemetryClient:
 
     @staticmethod
     def _norm_geo(text: str) -> str:
-        # Normalize accents/spacing so "Đà Nẵng", "Da Nang", "da nang" match consistently
         s = text.strip().lower()
         rep = (
             ("à", "a"), ("á", "a"), ("ả", "a"), ("ã", "a"), ("ạ", "a"),
@@ -2061,7 +2006,6 @@ class StreamTelemetryClient:
         if not ip:
             raise EgressGuardError("egress trace returned no IP address")
 
-        # Resolve city / region / ISP from GeoIP via the exact same proxy
         city, region, isp = "", "", ""
         for g_url in geoip_urls:
             try:
@@ -2106,8 +2050,7 @@ class StreamTelemetryClient:
             got_city = self._norm_geo(city)
             if not got_city or not any(wc in got_city or got_city in wc for wc in want_cities):
                 raise EgressGuardError(
-                    f"egress city '{city or 'unknown'}' does not match EXPECTED_CITY='{expected_city}' "
-                    f"(Discord login location comes strictly from your proxy IP, not headers)"
+                    f"egress city '{city or 'unknown'}' does not match EXPECTED_CITY='{expected_city}'"
                 )
 
         if expected_region.strip():
@@ -2127,11 +2070,6 @@ class StreamTelemetryClient:
         return {"ip": ip, "loc": loc, "city": city, "region": region, "isp": isp, "warp": warp}
 
     def _seed_device_cookies(self, raw_cookie_env: str) -> None:
-        """
-        Optionally seeds ONLY Discord's long-lived device cookies (__dcfduid, __sdcfduid).
-        Intentionally strips IP/TLS-bound Cloudflare cookies (cf_clearance, __cfruid, _cfuvid)
-        so users can never accidentally trigger session-hijack flags.
-        """
         allowed = {}
         for part in raw_cookie_env.split(";"):
             if "=" in part:
@@ -2384,7 +2322,6 @@ class StreamTelemetryClient:
         return str(data.get("username") or "user")
 
     def rotate_launch_session(self) -> None:
-        """Generate a fresh Desktop app launch identity (used when waking up from daily rest)."""
         self.heartbeat_session = str(uuid.uuid4())
         self.launch_signature = str(uuid.uuid4())
         self.super_props_dict, self.gateway_props_dict, self.build_summary = resolve_discord_app_props(
@@ -2396,7 +2333,6 @@ class StreamTelemetryClient:
         self._rebuild_headers()
 
     def desktop_cold_boot_read(self) -> dict[str, int]:
-        """Benign read-only Desktop startup endpoints spaced naturally like official Electron client."""
         results: dict[str, int] = {}
         for name, path in (
             ("settings_proto_1", "/api/v9/users/@me/settings-proto/1"),
@@ -2409,7 +2345,6 @@ class StreamTelemetryClient:
         return results
 
     def build_app_opened(self) -> list[dict]:
-        """Simulates authentic Discord Desktop cold-boot app_opened telemetry event."""
         now_ms = int(time.time() * 1000)
         cpu_pct, mem_kb = self.device.sample_perf()
         return [
@@ -2439,7 +2374,6 @@ class StreamTelemetryClient:
         self, game: Game, gsid: str, guild_id: str, channel_id: str,
         rtc_id: str = "", media_id: str = "",
     ) -> list[dict]:
-        """Real Desktop order: game process is detected BEFORE user clicks Go Live."""
         now_ms = int(time.time() * 1000)
         fp = self.fp_engine.for_game(game.id, game.exe)
         cpu_pct, mem_kb = self.device.sample_perf()
@@ -2633,13 +2567,6 @@ class StreamTelemetryClient:
 
 
 class LocalChromeWSBridge:
-    """
-    Loopback-only RFC 6455 WebSocket bridge (127.0.0.1:<ephemeral>) that relays Node's Discord
-    Gateway WebSocket traffic through Python's curl_cffi Chrome-TLS WebSocket client.
-    Eliminates the Node OpenSSL JA3/JA4 mismatch on wss://gateway.discord.gg while preserving
-    exact text & binary (zlib-stream) framing, cookies, headers, and pinned proxy.
-    """
-
     _WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
     def __init__(self, client: StreamTelemetryClient, log: Logger, upstream_factory=None) -> None:
@@ -2703,7 +2630,6 @@ class LocalChromeWSBridge:
 
     @classmethod
     def read_ws_frame(cls, conn: socket.socket) -> tuple[int, bytes] | None:
-        """Read one RFC 6455 frame (unmasking client payloads, reassembling fragmented frames)."""
         msg_opcode = -1
         fragments = bytearray()
         while True:
@@ -2734,7 +2660,6 @@ class LocalChromeWSBridge:
             if masked and length > 0:
                 payload = bytes(b ^ mask_key[i & 3] for i, b in enumerate(payload))
 
-            # Control frames (ping/pong/close) are never fragmented
             if opcode >= 0x8:
                 return opcode, payload
 
@@ -2852,7 +2777,6 @@ class LocalChromeWSBridge:
                             data, flags = res[0], res[1]
                             if not data and flags == 0:
                                 continue
-                            # curl_cffi CURLWS flags: TEXT=1, BINARY=2, CLOSE=8, PING=16, PONG=64
                             if flags & 8:
                                 _send_local(0x8, data if isinstance(data, bytes) else b"")
                                 break
@@ -2886,16 +2810,16 @@ class LocalChromeWSBridge:
                 if frm is None:
                     break
                 op, payload = frm
-                if op == 0x8:  # Close
+                if op == 0x8:
                     try:
                         upstream.close()
                     except Exception:
                         pass
                     break
-                if op == 0x9:  # Ping
+                if op == 0x9:
                     _send_local(0xA, payload)
                     continue
-                if op == 0xA:  # Pong
+                if op == 0xA:
                     continue
                 if op == 0x1:
                     if hasattr(upstream, "send_str"):
@@ -2923,12 +2847,6 @@ class LocalChromeWSBridge:
 
 
 class LocalChromeTLSBridge:
-    """
-    Loopback-only HTTP bridge (127.0.0.1:<ephemeral>) routing Node's Discord REST traffic
-    through Python's Chrome-impersonating curl_cffi session. Scrubs all Node/selfbot headers
-    and injects normalized Fake Discord Desktop headers + organic cookies.
-    """
-
     _HOP_BY_HOP = frozenset({
         "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
         "te", "trailers", "transfer-encoding", "upgrade", "content-encoding", "content-length",
@@ -3001,7 +2919,6 @@ class LocalChromeTLSBridge:
                     if "/users/@me" in upstream_path or "/gateway" in upstream_path or "captcha" in lock_reason:
                         bridge.on_auth_fatal(f"Node REST via bridge {lock_reason} on {upstream_path}")
 
-                # Rewrite Gateway URL to local Chrome-TLS WS Bridge when active
                 if (
                     st == 200
                     and bridge.ws_bridge is not None
@@ -3124,11 +3041,13 @@ class WebRTCSidecar:
             "channelId": self.channel_id,
             "mediaFile": self.media_file,
             "streamType": "go-live",
+            "width": q_cfg["width"],
             "height": q_cfg["height"],
             "fps": q_cfg["fps"],
             "kbps": q_cfg["kbps"],
             "maxKbps": q_cfg["max_kbps"],
             "includeAudio": include_audio,
+            "noTranscoding": bool(q_cfg.get("no_transcoding", False)),
             "status": self.status,
             "activities": self.activities,
             "selfMute": self.self_mute,
@@ -3484,7 +3403,6 @@ class StreamRunnerStealth:
             self.current_refresh_sec = self._pick_refresh_window()
             meta, gsid = dict(self._active_meta), self._active_gsid
         has_sound = bool(q_cfg.get("include_audio", False)) and (sys.platform != "darwin")
-        # Authentic Desktop order: game_launch telemetry first, brief pause, then video_stream_started
         launch_evs = self.telemetry.build_game_launch(
             self.game, gsid, self.guild_id, self.channel_id,
             rtc_id=meta["rtc_connection_id"], media_id=meta["media_session_id"],
@@ -3572,7 +3490,6 @@ class StreamRunnerStealth:
                 self.log.info(f"entering ACTIVE_HOURS · waking up in {wake_jitter:.0f}s...")
                 if self.stop_event.wait(wake_jitter):
                     break
-                # Fresh Desktop cold-boot identity & egress check after daily rest
                 self.telemetry.rotate_launch_session()
                 self._rotate_game_if_configured()
                 if not self._check_egress_runtime(tag="wake-guard"):
@@ -3771,7 +3688,6 @@ class StreamRunnerStealth:
         else:
             self.log.warn("tls", "curl_cffi not installed · using stdlib HTTPS fallback")
 
-        # 1. Fail-Closed Egress IP, Country, City & ISP Guard
         try:
             eg = self.telemetry.verify_egress_ip(
                 require_proxy=self.require_proxy,
@@ -3788,11 +3704,9 @@ class StreamRunnerStealth:
             self.trigger_halt(f"Egress IP Guard blocked startup: {exc}")
             return True
 
-        # 2. Organic Cookie Warm-up (/app) bound to active IP + Chrome TLS
         ck_count = self.telemetry.warm_up_cookies()
         self.log.ok("cookies", f"warmed {ck_count} organic Discord/Cloudflare cookie(s) via Chrome TLS")
 
-        # 3. Authentic Desktop Cold-Boot sequence (/users/@me -> settings-proto -> app_opened)
         if self.enable_science:
             try:
                 username = self.telemetry.ensure_analytics_token()
@@ -3856,9 +3770,9 @@ def main() -> int:
         ok = install_webrtc_stack(log)
         if ok:
             try:
-                q = os.environ.get("STREAM_QUALITY", "ultra_lite").strip().lower()
+                q = os.environ.get("STREAM_QUALITY", "720p30_lite").strip().lower()
                 if q not in QUALITY_PRESETS:
-                    q = "ultra_lite"
+                    q = "720p30_lite"
                 prepare_playable_mp4(os.environ.get("STREAM_MEDIA_URL", ""), q, log)
             except Exception as exc:
                 log.warn("setup", f"pre-cache mp4 skipped ({exc})")
@@ -3869,16 +3783,15 @@ def main() -> int:
     guild_id = os.environ.get("GUILD_ID", "").strip()
     channel_id = os.environ.get("CHANNEL_ID", "").strip()
     game_query = os.environ.get("STREAM_GAME", "Grand Theft Auto: Vice City").strip()
-    quality_key = os.environ.get("STREAM_QUALITY", "ultra_lite").strip().lower()
+    quality_key = os.environ.get("STREAM_QUALITY", "720p30_lite").strip().lower()
     if quality_key not in QUALITY_PRESETS:
-        quality_key = "ultra_lite"
+        quality_key = "720p30_lite"
     media_url = os.environ.get("STREAM_MEDIA_URL", "").strip()
     status = os.environ.get("STREAM_STATUS", "online").strip().lower()
     if status not in ("online", "idle", "dnd", "invisible"):
         status = "online"
     custom_status = os.environ.get("CUSTOM_STATUS", "").strip()
 
-    # Fake Device & Fake Discord App Configuration
     locale = os.environ.get("DISCORD_LOCALE", "vi").strip() or "vi"
     timezone = os.environ.get("DISCORD_TIMEZONE", "Asia/Ho_Chi_Minh").strip() or "Asia/Ho_Chi_Minh"
     accept_lang = os.environ.get("ACCEPT_LANGUAGE", "vi-VN,vi;q=0.9,en-US;q=0.8").strip()
@@ -3898,7 +3811,6 @@ def main() -> int:
     except ValueError:
         capabilities = FALLBACK_DESKTOP_CAPABILITIES
 
-    # Egress IP Pinning & Guard
     main_proxy = os.environ.get("DISCORD_PROXY", "").strip()
     alt_proxy = os.environ.get("ALT_PROXY", "").strip() or main_proxy
     require_proxy = os.environ.get("REQUIRE_PROXY", "0").strip().lower() in ("1", "true", "yes", "on")
@@ -4004,7 +3916,7 @@ def main() -> int:
 
     log.ok(
         "ready",
-        f"stealth v7.1 live · Guild {guild_id} › Channel {channel_id} · quality={quality_key} · science={enable_science} · proxy={bool(main_proxy)} · schedule={active_hours_spec or '24/7'}",
+        f"stealth v7.2 live · Guild {guild_id} › Channel {channel_id} · quality={quality_key} · science={enable_science} · proxy={bool(main_proxy)} · schedule={active_hours_spec or '24/7'}",
     )
     stop_sig.wait()
     log.info("shutting down cleanly...")
