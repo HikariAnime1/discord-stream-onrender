@@ -1642,7 +1642,7 @@ def prepare_playable_mp4(media_source: str, quality_key: str, log: Logger) -> st
     fallback_ua = build_desktop_user_agent(
         "windows", FALLBACK_CLIENT_VERSION, FALLBACK_CHROME_VERSION, FALLBACK_ELECTRON_VERSION
     )
-    gop = fps if no_transcoding else fps * 2
+    gop = (fps * 10) if video_mode == "static_720p" else (fps if no_transcoding else fps * 2)--
     x264_extra = (
         ["-tune", "zerolatency", "-bf", "0", "-x264-params", "repeat-headers=1:scenecut=0", "-keyint_min", str(gop)]
         if no_transcoding else []
@@ -1702,7 +1702,11 @@ def prepare_playable_mp4(media_source: str, quality_key: str, log: Logger) -> st
 
     if video_mode == "black":
         lavfi_video = f"color=c=black:s={w}x{h}:r={fps}"
-        extra_vf: list[str] = []
+        extra_vf: list[str] = []-
+    elif video_mode == "static_720p":
+        # Pure static 1280x720@30fps grid -> near-zero P-frame size (~8-12 kbps total)
+        lavfi_video = f"color=c=0x0d1117:s={w}x{h}:r={fps}"
+        extra_vf = ["-vf", "drawgrid=w=80:h=80:t=1:c=0x161b22@0.35,format=yuv420p"]
     elif video_mode == "ambient_720p":
         lavfi_video = f"color=c=0x0d1117:s={w}x{h}:r={fps}"
         extra_vf = [
